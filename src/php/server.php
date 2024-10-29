@@ -1,107 +1,58 @@
 <?php
 
-class Server {
-    // Server properties
+class ServerManager {
     private $serverName;
-    private $serverPort;
+    private $hostServer; // Es: localhost (12.0.0.1) or public ip
+    private $serverPort; // Es: 80, 443
     private $adminEmail;
+    private $dbConnection;
 
-    // Database properties
-    private $dbHost;
-    private $dbUser;
-    private $dbPassword;
-    private $dbName;
-    private $connection;
-
-    // Create a new server object and connect to the database
-    public function __construct($serverName, $serverPort, $adminEmail, $dbHost, $dbUser, $dbPassword, $dbName) {
-        // Server info
+    // Constructor to set the properties and get the database connection
+    public function __construct($serverName, $hostServer, $serverPort, $adminEmail, $dbHost, $dbUser, $dbPassword, $dbName) {
         $this->serverName = $serverName;
         $this->serverPort = $serverPort;
         $this->adminEmail = $adminEmail;
-        
-        // Database info
-        $this->dbHost = $dbHost;
-        $this->dbUser = $dbUser;
-        $this->dbPassword = $dbPassword;
-        $this->dbName = $dbName;
+
+        // Create a new instance of the DatabaseManager class
+        $this->dbConnection = DatabaseManager::getInstance($dbHost, $dbUser, $dbPassword, $dbName);
     }
 
-    // Connect to the database
-    private function connectToDatabase() {
-        $this->connection = new mysqli($this->dbHost, $this->dbUser, $this->dbPassword, $this->dbName);
-
-        if ($this->connection->connect_error) {
-            die("Error to connect to database: " . $this->connection->connect_error);
+    public isConnected() {
+        if ($this->dbConnection->getConnection()) {
+            return true;
         }
+        return false;
     }
 
-    // Close the connection
-    public function closeConnection() {
-        if ($this->connection) {
-            $this->connection->close();
-        }
-    }
-
-    // Metodo per eseguire una query di selezione
+    // Method to execute a select query and return the result
     public function executeSelectQuery($query, $params = []) {
-        $stmt = $this->connection->prepare($query);
-
-        if (!empty($params)) {
-            // Costruire i tipi di parametri dinamicamente
-            $types = str_repeat('s', count($params));
-            $stmt->bind_param($types, ...$params);
-        }
-
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $stmt->close();
-
-        return $result->fetch_all(MYSQLI_ASSOC);
+        return $this->dbConnection->executeSelectQuery($query, $params);
     }
 
-    // Execute a query that doesn't return a result
+    // MNethod to execute a query and return the result
     public function executeQuery($query, $params = []) {
-        $stmt = $this->connection->prepare($query);
-
-        if (!empty($params)) {
-            $types = str_repeat('s', count($params));
-            $stmt->bind_param($types, ...$params);
-        }
-
-        $stmt->execute();
-        $affectedRows = $stmt->affected_rows;
-        $stmt->close();
-
-        return $affectedRows;
+        return $this->dbConnection->executeQuery($query, $params);
     }
 
-    //Get server info
+    // Method to close the database connection
+    public function closeConnection() {
+        $this->dbConnection->closeConnection();
+    }
+
+    // Method to get the server information
     public function getServerInfo() {
         return [
-            'serverName' => $this->serverName,
+            'serverName' => $this->serverName.
+            'hostServer' => $this->hostServer,
             'serverPort' => $this->serverPort,
-            'adminEmail' => $this->adminEmail
+            'adminEmail' => $this->adminEmail,
+            // Return the database connection info
+            'dbConnection' => $this->dbConnection->getDatabaseInfo()
         ];
     }
 
-    // Return true if the connection is active
-    public function isConnect() {
-        if($this->connection){
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    // Set error message
-    public function setError($message) {
-        error_log("Errore sul server: " . $message);
-    }
-
-    // Destructor to close the connection
+    // Destructor to close the database connection
     public function __destruct() {
         $this->closeConnection();
     }
 }
-
